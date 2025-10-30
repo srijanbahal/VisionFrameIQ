@@ -1,11 +1,22 @@
+# Core app
+streamlit
+pillow
+numpy
 torch
 transformers
 qdrant-client
-opencv-python
-pillow
-gradio
-streamlit
-segment-anything
-opencv-python
+
+# Vision
+opencv-python-headless
 supervision
+
+# Multimodal models
+sentencepiece
+protobuf
+accelerate
+safetensors
+timm
+huggingface-hub
+
+# Optional (SAM / CLIPSeg)
 git+https://github.com/facebookresearch/segment-anything-2.git
