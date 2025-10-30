@@ -1,0 +1,7 @@
+torch
+transformers
+qdrant-client
+opencv-python
+pillow
+gradio
+streamlit
