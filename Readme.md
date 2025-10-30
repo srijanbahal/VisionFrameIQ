@@ -1,10 +1,10 @@
-# VideoFrameIQ: Multimodal Video Understanding & Retrieval
+# VisionFrameIQ: Multimodal Video Understanding & Retrieval
 
 **"Bridging text, vision, and segmentation for intelligent video insights."**
 
 ## 🚀 Overview
 
-VideoFrameIQ is a multimodal video intelligence system designed to:
+VisionFrameIQ is a multimodal video intelligence system designed to:
 
 - Extract video frames efficiently and embed them using CLIP for semantic search.
 - Retrieve the most relevant frames for text queries (e.g., "person smiling while driving").
@@ -27,7 +27,7 @@ VideoFrameIQ is a multimodal video intelligence system designed to:
 ## 🏗️ Current Architecture
 
 ```
-VideoFrameIQ/
+VisionFrameIQ/
 │
 ├── app.py                  # Streamlit interface (upload, search, display)
 ├── utils.py                # Frame extraction, embeddings, Qdrant helper functions
@@ -45,8 +45,8 @@ VideoFrameIQ/
 ### 1️⃣ Clone & Setup Environment
 
 ```bash
-git clone https://github.com/<your-username>/VideoFrameIQ.git
-cd VideoFrameIQ
+git clone https://github.com/<your-username>/VisionFrameIQ.git
+cd VisionFrameIQ
 
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
