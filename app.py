@@ -2,81 +2,106 @@ import streamlit as st
 from PIL import Image
 import os
 from utils import (
-    extract_frames, get_embedding, smooth_embeddings,
-    create_collection, insert_embeddings, search_frames, generate_caption
+    extract_frames,
+    get_embedding,
+    smooth_embeddings,
+    create_collection,
+    insert_embeddings,
+    search_frames,
+    generate_caption,
+)
+from segment import generate_highlighted_region
+
+
+st.set_page_config(page_title="VideoFrameIQ", page_icon="🎥", layout="wide")
+
+st.markdown(
+    "<h2 style='text-align:center;'>🎥 VideoFrameIQ</h2>", unsafe_allow_html=True
+)
+st.markdown(
+    "<p style='text-align:center;'>Multi-Video Semantic Retrieval via CLIP + BLIP + Qdrant</p>",
+    unsafe_allow_html=True,
+)
+st.divider()
+
+# Sidebar
+st.sidebar.header("⚙️ Settings")
+fps = st.sidebar.slider("Frames per second", 1, 5, 2)
+top_k = st.sidebar.slider("Top frames to display", 1, 10, 4)
+st.sidebar.markdown("### 🧠 Example Queries")
+st.sidebar.write("- person walking\n- car moving\n- someone talking\n- dog running")
+
+if "videos" not in st.session_state:
+    st.session_state.videos = []
+if "initialized" not in st.session_state:
+    create_collection()
+    st.session_state.initialized = True
+
+# ============ UPLOAD & PREVIEW SECTION ============
+st.subheader("📂 Upload Videos")
+uploaded_files = st.file_uploader(
+    "Select one or more short video clips (MP4)",
+    type=["mp4"],
+    accept_multiple_files=True,
 )
 
-st.set_page_config(page_title="VideoFrameIQ", page_icon="🎥", layout="centered")
+upload_dir = "sample_vision/uploaded"
+os.makedirs(upload_dir, exist_ok=True)
 
-st.markdown("<h2 style='text-align:center;'>🎥 VideoFrameIQ</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align:center;'>Multimodal Video Understanding via CLIP + BLIP + Qdrant</p>", unsafe_allow_html=True)
+if uploaded_files:
+    # Save uploaded videos locally
+    saved_videos = []
+    for video_file in uploaded_files:
+        video_path = os.path.join(upload_dir, video_file.name)
+        with open(video_path, "wb") as f:
+            f.write(video_file.getbuffer())
+        video_name = os.path.splitext(video_file.name)[0]
+        saved_videos.append((video_name, video_path))
 
-# Sidebar controls
-st.sidebar.header("⚙️ Settings")
-fps = st.sidebar.slider("Frames per second to extract", 1, 5, 2)
-top_k = st.sidebar.slider("Top results to display", 1, 5, 3)
-st.sidebar.markdown("### 🧠 Example Queries")
-st.sidebar.write("- person walking")
-st.sidebar.write("- car moving")
-st.sidebar.write("- someone talking")
-st.sidebar.write("- animal running")
+    # Compact preview grid
+    st.markdown("### 🎞️ Video Previews")
+    cols = st.columns(3)
+    for i, (vname, vpath) in enumerate(saved_videos):
+        col = cols[i % 3]
+        col.markdown(f"**{vname}**")
+        col.video(vpath, format="video/mp4", start_time=0)
 
-with st.expander("ℹ️ About this project"):
-    st.markdown("""
-    **VideoFrameIQ** uses CLIP embeddings and Qdrant vector search  
-    to retrieve the most relevant video frames for your text query.  
-    BLIP captions are used to describe retrieved frames.
-    """)
+    # Process all videos together
+    if st.button("⚙️ Process All Videos"):
+        for vname, vpath in saved_videos:
+            with st.spinner(f"Processing {vname} ..."):
+                frames, video_name = extract_frames(vpath, fps=fps)
+                embeddings = [get_embedding(f) for f in frames]
+                embeddings = smooth_embeddings(embeddings)
+                insert_embeddings(embeddings, frames, video_name)
+                if video_name not in st.session_state.videos:
+                    st.session_state.videos.append(video_name)
+        st.success("✅ All videos processed and indexed successfully!")
 
-video_file = st.file_uploader("Upload a short video (MP4)", type=["mp4"])
-query = st.text_input("Enter a text query (e.g. 'person walking', 'car moving')")
+# ============ RETRIEVAL SECTION ============
+st.divider()
+st.subheader("🔍 Search Video Frames")
 
-# if video_file:
-#     video_path = f"uploaded_{video_file.name}"
-#     with open(video_path, "wb") as f:
-#         f.write(video_file.getbuffer())
-#     st.video(video_path)
+query = st.text_input("Enter a text query (e.g., 'person walking', 'car moving')")
+if st.session_state.videos:
+    selected_video = st.sidebar.selectbox(
+        "Filter by video", ["All"] + st.session_state.videos
+    )
+else:
+    selected_video = "All"
 
-#     if st.button("Process Video"):
-#         with st.spinner("Extracting frames and computing embeddings..."):
-#             frames = extract_frames(video_path, fps=fps)
-#             embeddings = [get_embedding(f) for f in frames]
-#             embeddings = smooth_embeddings(embeddings)
-#             create_collection()
-#             insert_embeddings(embeddings, frames)
-#         st.success(f"✅ Processed {len(frames)} frames successfully!")
-
-if video_file:
-    # Ensure upload directory exists
-    upload_dir = "sample_vision/uploaded"
-    os.makedirs(upload_dir, exist_ok=True)
-
-    # Save uploaded video inside the upload directory
-    video_path = os.path.join(upload_dir, video_file.name)
-    with open(video_path, "wb") as f:
-        f.write(video_file.getbuffer())
-
-    # Display video preview
-    st.video(video_path)
-
-    # Process the video into frames + embeddings
-    if st.button("Process Video"):
-        with st.spinner("Extracting frames and computing embeddings..."):
-            frames = extract_frames(video_path, fps=fps)  # stores in frames/<video_name>/
-            embeddings = [get_embedding(f) for f in frames]
-            embeddings = smooth_embeddings(embeddings)
-            create_collection()
-            insert_embeddings(embeddings, frames)
-        st.success(f"✅ Processed {len(frames)} frames successfully!")
-
-
-if query and st.button("Search"):
+if query and st.button("🔎 Search"):
     with st.spinner("Searching best-matching frames..."):
-        results = search_frames(query, top_k=top_k)
+        results = search_frames(query, top_k=top_k, selected_video=selected_video)
         if not results:
-            st.warning("No matching frames found. Try a different query.")
+            st.warning("No matching frames found.")
         else:
-            cols = st.columns(len(results))
-            for i, r in enumerate(results):
-                caption = generate_caption(r)
-                cols[i].image(Image.open(r), caption=caption, use_column_width=True)
+            st.markdown("### 🖼️ Retrieved Frames")
+            n_cols = 3
+            rows = [results[i : i + n_cols] for i in range(0, len(results), n_cols)]
+            for row in rows:
+                cols = st.columns(len(row))
+                for i, (frame_path, vid_name) in enumerate(row):
+                    caption = generate_caption(frame_path)
+                    highlighted_img = generate_highlighted_region(frame_path, query)
+                    cols[i].image(highlighted_img, caption=f"{vid_name} — {caption}", use_column_width=True)
